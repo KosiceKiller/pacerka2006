@@ -1,19 +1,23 @@
--- Скрипт для ServerScriptService
--- Цей скрипт автоматично зменшує розмір персонажа розробників вдвічі
--- та робить їх імунними до пошкоджень
+-- Скрипт для Executor (Client-side)
+-- Цей скрипт автоматично застосовує Developer Mode до вашого персонажа
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
 
--- Список UserId розробників (замініть на реальні ID)
+print("🚀 [EXECUTOR] Developer Mode активовано!")
+
+-- Список UserId розробників (можна залишити порожнім для автоматичного режиму)
 local DEVELOPER_IDS = {
-    123456789, -- Замініть на реальні UserId розробників
-    987654321,
-    -- Додайте інші ID розробників тут
+    -- Залишіть порожнім щоб працювати для всіх, або додайте конкретні ID
 }
 
 -- Функція для перевірки, чи є гравець розробником
 local function isDeveloper(player)
+    if #DEVELOPER_IDS == 0 then
+        return true -- Якщо список порожній, працює для всіх
+    end
+    
     for _, devId in ipairs(DEVELOPER_IDS) do
         if player.UserId == devId then
             return true
@@ -22,130 +26,163 @@ local function isDeveloper(player)
     return false
 end
 
--- Функція для масштабування персонажа (включаючи Hitbox)
+-- Функція для client-side масштабування
 local function scaleCharacter(character, scaleFactor)
+    print("🔧 [EXECUTOR] Масштабуємо персонажа:", character.Name)
+    
     local humanoid = character:FindFirstChild("Humanoid")
     if not humanoid then return end
     
-    -- Отримуємо всі частини тіла
-    for _, part in pairs(character:GetChildren()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            -- Масштабуємо розмір частини тіла
-            part.Size = part.Size * scaleFactor
-            
-            -- Масштабуємо всі аксесуари та об'єкти на частині тіла
-            for _, child in pairs(part:GetChildren()) do
-                if child:IsA("SpecialMesh") then
-                    child.Scale = child.Scale * scaleFactor
-                elseif child:IsA("Weld") or child:IsA("Motor6D") then
-                    -- Масштабуємо позиції з'єднань
-                    child.C0 = child.C0 * CFrame.new(0, 0, 0) + child.C0.Position * (scaleFactor - 1)
-                    child.C1 = child.C1 * CFrame.new(0, 0, 0) + child.C1.Position * (scaleFactor - 1)
-                end
-            end
-        elseif part.Name == "HumanoidRootPart" then
-            -- Масштабуємо тільки розмір HumanoidRootPart (не позицію)
-            part.Size = part.Size * scaleFactor
+    -- Client-side масштабування через NumberValue об'єкти
+    local function createOrUpdateValue(name, value)
+        local existing = character:FindFirstChild(name)
+        if existing then
+            existing.Value = value
+        else
+            local newValue = Instance.new("NumberValue")
+            newValue.Name = name
+            newValue.Value = value
+            newValue.Parent = character
         end
     end
     
-    -- Масштабуємо швидкість ходьби та стрибка відповідно до нового розміру
+    -- Встановлюємо значення масштабування
+    createOrUpdateValue("BodyDepthScale", scaleFactor)
+    createOrUpdateValue("BodyHeightScale", scaleFactor)
+    createOrUpdateValue("BodyWidthScale", scaleFactor)
+    createOrUpdateValue("HeadScale", scaleFactor)
+    
+    -- Додатково масштабуємо швидкості
+    wait(0.5) -- Чекаємо застосування масштабу
+    
     if humanoid then
-        humanoid.WalkSpeed = humanoid.WalkSpeed * scaleFactor
-        humanoid.JumpPower = humanoid.JumpPower * scaleFactor
-    end
-    
-    -- Масштабуємо аксесуари
-    for _, accessory in pairs(character:GetChildren()) do
-        if accessory:IsA("Accessory") then
-            local handle = accessory:FindFirstChild("Handle")
-            if handle then
-                handle.Size = handle.Size * scaleFactor
-                local mesh = handle:FindFirstChildOfClass("SpecialMesh")
-                if mesh then
-                    mesh.Scale = mesh.Scale * scaleFactor
-                end
-            end
+        humanoid.WalkSpeed = 16 * scaleFactor
+        if humanoid.JumpHeight then
+            humanoid.JumpHeight = 7.2 * scaleFactor
+        elseif humanoid.JumpPower then
+            humanoid.JumpPower = 50 * scaleFactor
         end
     end
+    
+    print("✅ [EXECUTOR] Масштабування завершено!")
 end
 
--- Функція для налаштування імунітету до пошкоджень
-local function setupImmunity(character)
+-- Функція для налаштування локального імунітету (обмежено на client-side)
+local function setupClientImmunity(character)
+    print("🔧 [EXECUTOR] Налаштовуємо client-side імунітет")
+    
     local humanoid = character:FindFirstChild("Humanoid")
     if not humanoid then return end
     
-    -- Встановлюємо нескінченне здоров'я
-    humanoid.MaxHealth = math.huge
-    humanoid.Health = math.huge
+    -- Встановлюємо високе здоров'я (не math.huge, бо це може не працювати client-side)
+    humanoid.MaxHealth = 99999
+    humanoid.Health = 99999
     
-    -- Забороняємо всі небажані стани
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+    -- Забороняємо деякі стани (client-side обмеження)
+    pcall(function()
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
+    end)
     
-    -- Додаткова перевірка на зміну здоров'я
-    humanoid.HealthChanged:Connect(function(health)
-        if health < math.huge then
-            humanoid.Health = math.huge
+    -- Постійно відновлюємо здоров'я
+    local healthConnection
+    healthConnection = humanoid.HealthChanged:Connect(function(health)
+        if health < humanoid.MaxHealth * 0.99 then
+            humanoid.Health = humanoid.MaxHealth
         end
     end)
     
-    -- Блокуємо можливість загибелі
-    humanoid.Died:Connect(function()
-        wait(0.1)
-        humanoid.Health = math.huge
+    -- Очищаємо з'єднання при видаленні персонажа
+    character.AncestryChanged:Connect(function()
+        if not character.Parent then
+            if healthConnection then
+                healthConnection:Disconnect()
+            end
+        end
     end)
+    
+    print("✅ [EXECUTOR] Client-side імунітет налаштовано!")
 end
 
--- Функція для налаштування персонажа розробника
-local function setupDeveloperCharacter(character, player)
-    -- Чекаємо поки персонаж повністю завантажиться
-    character:WaitForChild("Humanoid")
-    character:WaitForChild("HumanoidRootPart")
+-- Функція для применения всех настроек
+local function applyDeveloperMode(character)
+    if not character then return end
     
-    -- Невелика затримка для повного завантаження
-    wait(0.5)
+    -- Чекаємо завантаження персонажа
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    local rootPart = character:WaitForChild("HumanoidRootPart", 5)
     
-    print("[DEV MODE] Налаштовуємо персонажа для розробника:", player.Name)
-    
-    -- Зменшуємо персонажа вдвічі
-    scaleCharacter(character, 0.5)
-    
-    -- Налаштовуємо імунітет до пошкоджень
-    setupImmunity(character)
-    
-    print("[DEV MODE] Персонаж", player.Name, "успішно налаштований!")
-end
-
--- Обробник появи гравця
-local function onPlayerAdded(player)
-    -- Перевіряємо, чи є гравець розробником
-    if not isDeveloper(player) then
-        return -- Якщо не розробник, нічого не робимо
+    if not humanoid or not rootPart then
+        warn("❌ [EXECUTOR] Не вдалося завантажити персонажа!")
+        return
     end
     
-    print("[DEV MODE] Розробник приєднався:", player.Name, "ID:", player.UserId)
+    -- Невелика затримка для стабільності
+    wait(1)
     
-    -- Налаштовуємо поточний персонаж (якщо він уже існує)
-    if player.Character then
-        setupDeveloperCharacter(player.Character, player)
+    print("🎯 [EXECUTOR] Застосовуємо Developer Mode...")
+    
+    -- Застосовуємо всі налаштування
+    scaleCharacter(character, 0.5) -- Зменшуємо вдвічі
+    setupClientImmunity(character)
+    
+    print("🎉 [EXECUTOR] Developer Mode застосовано успішно!")
+end
+
+-- Основна логіка для executor
+if LocalPlayer then
+    print("👤 [EXECUTOR] Локальний гравець:", LocalPlayer.Name, "ID:", LocalPlayer.UserId)
+    
+    -- Перевіряємо, чи потрібно застосовувати
+    if isDeveloper(LocalPlayer) or #DEVELOPER_IDS == 0 then
+        print("✅ [EXECUTOR] Активуємо Developer Mode для поточного гравця")
+        
+        -- Застосовуємо до поточного персонажа
+        if LocalPlayer.Character then
+            applyDeveloperMode(LocalPlayer.Character)
+        end
+        
+        -- Застосовуємо до майбутніх персонажів (при респавні)
+        LocalPlayer.CharacterAdded:Connect(function(character)
+            print("🔄 [EXECUTOR] Новий персонаж - застосовуємо налаштування...")
+            applyDeveloperMode(character)
+        end)
+        
+        -- Додаткова перевірка кожні 5 секунд (на випадок збоїв)
+        spawn(function()
+            while LocalPlayer and LocalPlayer.Parent do
+                wait(5)
+                if LocalPlayer.Character then
+                    local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+                    if humanoid and humanoid.Health < 50000 then
+                        print("🔄 [EXECUTOR] Відновлюємо налаштування...")
+                        setupClientImmunity(LocalPlayer.Character)
+                    end
+                end
+            end
+        end)
+        
+    else
+        print("❌ [EXECUTOR] Ви не в списку розробників")
     end
-    
-    -- Налаштовуємо майбутні персонажі при респавні
-    player.CharacterAdded:Connect(function(character)
-        setupDeveloperCharacter(character, player)
-    end)
+else
+    warn("❌ [EXECUTOR] Не вдалося знайти LocalPlayer!")
 end
 
--- Підключаємо обробник до події появи гравців
-Players.PlayerAdded:Connect(onPlayerAdded)
+print("🚀 [EXECUTOR] Ініціалізацію завершено!")
 
--- Обробляємо гравців, які вже в грі (на випадок, якщо скрипт запускається після їх приєднання)
-for _, player in pairs(Players:GetPlayers()) do
-    onPlayerAdded(player)
+-- Додаткові команди для ручного керування (виконайте в консолі executor)
+_G.ApplyDevMode = function()
+    if LocalPlayer.Character then
+        applyDeveloperMode(LocalPlayer.Character)
+    end
 end
 
-print("[DEV MODE] Скрипт розробника активовано!")
+_G.ResetScale = function()
+    if LocalPlayer.Character then
+        scaleCharacter(LocalPlayer.Character, 1) -- Повертаємо нормальний розмір
+    end
+end
+
+print("💡 [EXECUTOR] Доступні команди: _G.ApplyDevMode() та _G.ResetScale()")
