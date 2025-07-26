@@ -1,9 +1,84 @@
--- Скрипт для Executor (Client-side)
+warn("❌ [EXECUTOR] Не вдалося з-- Скрипт для Executor (Client-side)
 -- Цей скрипт автоматично застосовує Developer Mode до вашого персонажа
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+
+-- Створюємо яскраве повідомлення про успішну ін'єкцію
+local function createNotification(title, text, duration)
+    duration = duration or 5
+    
+    -- Створюємо GUI повідомлення
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "DevModeNotification"
+    screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 400, 0, 100)
+    frame.Position = UDim2.new(0.5, -200, 0, -120)
+    frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    
+    -- Додаємо градієнт
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 100)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 255, 100))
+    }
+    gradient.Parent = frame
+    
+    -- Заголовок
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    titleLabel.Position = UDim2.new(0, 0, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.new(1, 1, 1)
+    titleLabel.TextScaled = true
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Parent = frame
+    
+    -- Текст
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    textLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = text
+    textLabel.TextColor3 = Color3.new(0.9, 0.9, 0.9)
+    textLabel.TextScaled = true
+    textLabel.Font = Enum.Font.Gotham
+    textLabel.Parent = frame
+    
+    -- Анімація появи
+    frame:TweenPosition(UDim2.new(0.5, -200, 0, 20), "Out", "Quad", 0.5, true)
+    
+    -- Видаляємо через час
+    game:GetService("Debris"):AddItem(screenGui, duration)
+    
+    -- Анімація зникнення
+    spawn(function()
+        wait(duration - 0.5)
+        frame:TweenPosition(UDim2.new(0.5, -200, 0, -120), "In", "Quad", 0.5, true)
+    end)
+end
+
+-- Звуковий сигнал
+local function playSound()
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxasset://sounds/electronicpingshort.wav"
+    sound.Volume = 0.5
+    sound.Parent = game.Workspace
+    sound:Play()
+    sound.Ended:Connect(function()
+        sound:Destroy()
+    end)
+end
+
+-- Повідомлення про запуск
+createNotification("🚀 DEVELOPER MODE", "Скрипт успішно заін'єктився!", 3)
+playSound()
 
 print("🚀 [EXECUTOR] Developer Mode активовано!")
 
@@ -65,6 +140,9 @@ local function scaleCharacter(character, scaleFactor)
     end
     
     print("✅ [EXECUTOR] Масштабування завершено!")
+    
+    -- Повідомлення про масштабування
+    createNotification("📏 МАСШТАБУВАННЯ", "Персонаж зменшено вдвічі!", 3)
 end
 
 -- Функція для налаштування локального імунітету (обмежено на client-side)
@@ -103,6 +181,9 @@ local function setupClientImmunity(character)
     end)
     
     print("✅ [EXECUTOR] Client-side імунітет налаштовано!")
+    
+    -- Повідомлення про імунітет
+    createNotification("🛡️ ІМУНІТЕТ", "Захист від пошкоджень активовано!", 3)
 end
 
 -- Функція для применения всех настроек
@@ -128,6 +209,10 @@ local function applyDeveloperMode(character)
     setupClientImmunity(character)
     
     print("🎉 [EXECUTOR] Developer Mode застосовано успішно!")
+    
+    -- Фінальне повідомлення про успіх
+    createNotification("🎉 ГОТОВО!", "Developer Mode повністю активний!", 4)
+    playSound()
 end
 
 -- Основна логіка для executor
@@ -165,6 +250,7 @@ if LocalPlayer then
         
     else
         print("❌ [EXECUTOR] Ви не в списку розробників")
+        createNotification("❌ ДОСТУП ЗАБОРОНЕНО", "Ви не в списку розробників", 3)
     end
 else
     warn("❌ [EXECUTOR] Не вдалося знайти LocalPlayer!")
